@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		428B0FB82DCA4D4B00781EAC /* FSCalendar in Frameworks */ = {isa = PBXBuildFile; productRef = 428B0FB72DCA4D4B00781EAC /* FSCalendar */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		427B677F2DBF906B00BAE3CE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				428B0FB82DCA4D4B00781EAC /* FSCalendar in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,6 +96,7 @@
 				427B67672DBF906900BAE3CE /* ToDoZen24 */,
 				427B67812DBF906B00BAE3CE /* ToDoZen24Tests */,
 				427B678B2DBF906B00BAE3CE /* ToDoZen24UITests */,
+				428B0FB62DCA4D4B00781EAC /* Frameworks */,
 				427B67662DBF906900BAE3CE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +109,13 @@
 				427B67882DBF906B00BAE3CE /* ToDoZen24UITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		428B0FB62DCA4D4B00781EAC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -125,6 +138,7 @@
 			);
 			name = ToDoZen24;
 			packageProductDependencies = (
+				428B0FB72DCA4D4B00781EAC /* FSCalendar */,
 			);
 			productName = ToDoZen24;
 			productReference = 427B67652DBF906900BAE3CE /* ToDoZen24.app */;
@@ -575,6 +589,14 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		428B0FB72DCA4D4B00781EAC /* FSCalendar */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428B0FA92DCA46E100781EAC /* XCRemoteSwiftPackageReference "FSCalendar" */;
+			productName = FSCalendar;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 427B675D2DBF906900BAE3CE /* Project object */;
 }

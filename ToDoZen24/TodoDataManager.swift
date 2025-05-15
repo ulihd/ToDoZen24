@@ -65,7 +65,7 @@ class TodoDataManager {
     
     // Copies a to-do item to another date.
     func copyTodo(at index: Int, from sourceDate: String, to targetDate: String) {
-        guard var sourceTodos = todos[sourceDate], index >= 0, index < sourceTodos.count else { return }
+        guard let sourceTodos = todos[sourceDate], index >= 0, index < sourceTodos.count else { return }
         let task = TodoItem(description: sourceTodos[index].description, completed: false)
         if var targetTodos = todos[targetDate] {
             targetTodos.append(task)

@@ -224,16 +224,17 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
         print("Toggled completion at \(indexPath)")
     }
     
-    func copyTaskToNextDay(at indexPath: IndexPath) {
+    func copyTaskToTomorrow(at indexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
-        let nextDateKey = delegate.currentDate.nextDay().toString(format: "yyyy-MM-dd")
-        dataManager.copyTodo(at: indexPath.row, from: dateKey, to: nextDateKey)
+        let tomorrow = Date().nextDay()
+        let tomorrowKey = tomorrow.toString(format: "yyyy-MM-dd")
+        dataManager.copyTodo(at: indexPath.row, from: dateKey, to: tomorrowKey)
         if copiedTasks[dateKey] == nil { copiedTasks[dateKey] = [] }
         copiedTasks[dateKey]?.insert(indexPath.row)
         tableView?.reloadRows(at: [indexPath], with: .automatic)
         delegate.didAddOrEditTask()
-        print("Copied task at \(indexPath) to \(nextDateKey)")
+        print("Copied task at \(indexPath) from \(dateKey) to tomorrow (\(tomorrowKey))")
     }
     
     func savePendingTask(currentDate: Date) {

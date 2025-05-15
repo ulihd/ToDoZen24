@@ -164,7 +164,7 @@ class TodoCell: UITableViewCell {
             return
         }
         print("Copy button tapped at \(indexPath)")
-        delegate?.copyTaskToNextDay(at: indexPath)
+        delegate?.copyTaskToTomorrow(at: indexPath)
     }
 }
 

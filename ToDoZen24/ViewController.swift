@@ -10,37 +10,80 @@ import FSCalendar
 class ViewController: UIViewController {
     // MARK: Properties
     private let calendar = FSCalendar()
+    private let toolbar = UIToolbar()
+    private let dateButton = UIButton(type: .system)
     private let tableView = UITableView()
     private let dataManager = TodoDataManager()
     private var tableViewManager: TodoTableViewManager!
+    private var isCalendarDayView = false
     var currentDate = Date()
     
     // MARK: View Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        setupToolbar()
         setupCalendar()
-        setupGestures()
         setupTableView()
         dataManager.loadTodos()
+        updateDateLabel()
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        calendar.frame = CGRect(
+        let toolbarHeight: CGFloat = 44
+        let calendarHeight: CGFloat = isCalendarDayView ? 0 : 300
+        
+        toolbar.frame = CGRect(
             x: 0,
             y: view.safeAreaInsets.top,
             width: view.bounds.width,
-            height: calendar.scope == .month ? 300 : 100
+            height: toolbarHeight
+        )
+        calendar.frame = CGRect(
+            x: 0,
+            y: toolbar.frame.maxY,
+            width: view.bounds.width,
+            height: calendarHeight
         )
         tableView.frame = CGRect(
             x: 0,
-            y: calendar.frame.maxY,
+            y: isCalendarDayView ? toolbar.frame.maxY : calendar.frame.maxY,
             width: view.bounds.width,
-            height: view.bounds.height - calendar.frame.maxY - view.safeAreaInsets.bottom
+            height: view.bounds.height - (isCalendarDayView ? toolbar.frame.maxY : calendar.frame.maxY) - view.safeAreaInsets.bottom
         )
     }
     
     // MARK: Setup Methods
+    // Configures the toolbar with Today and date toggle button, with swipe gestures for navigation.
+    private func setupToolbar() {
+        let todayButton = UIBarButtonItem(
+            title: "Today",
+            style: .plain,
+            target: self,
+            action: #selector(returnToToday)
+        )
+        dateButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        dateButton.setTitleColor(.black, for: .normal)
+        dateButton.addTarget(self, action: #selector(toggleCalendarVisibility), for: .touchUpInside)
+        dateButton.sizeToFit()
+        
+        // Add swipe gestures for navigation
+        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(goToPreviousDay))
+        swipeRight.direction = .right
+        swipeRight.numberOfTouchesRequired = 1
+        dateButton.addGestureRecognizer(swipeRight)
+        
+        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(goToNextDay))
+        swipeLeft.direction = .left
+        swipeLeft.numberOfTouchesRequired = 1
+        dateButton.addGestureRecognizer(swipeLeft)
+        
+        let dateBarButton = UIBarButtonItem(customView: dateButton)
+        let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        toolbar.items = [todayButton, flexibleSpace, dateBarButton, flexibleSpace]
+        view.addSubview(toolbar)
+    }
+    
     // Configures the FSCalendar for date selection and appearance.
     private func setupCalendar() {
         calendar.delegate = self
@@ -54,19 +97,6 @@ class ViewController: UIViewController {
         view.addSubview(calendar)
     }
     
-    // Configures swipe gestures for navigating days and months.
-    private func setupGestures() {
-        let swipeLeft = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
-        swipeLeft.direction = .left
-        let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
-        swipeRight.direction = .right
-        let swipeUp = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
-        swipeUp.direction = .up
-        let swipeDown = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
-        swipeDown.direction = .down
-        [swipeLeft, swipeRight, swipeUp, swipeDown].forEach { calendar.addGestureRecognizer($0) }
-    }
-    
     // Configures the UITableView for displaying tasks.
     private func setupTableView() {
         tableViewManager = TodoTableViewManager(tableView: tableView, dataManager: dataManager, delegate: self)
@@ -78,41 +108,79 @@ class ViewController: UIViewController {
     }
     
     // MARK: Actions
-    // Handles swipe gestures to navigate days and months.
-    @objc private func handleSwipe(_ gesture: UISwipeGestureRecognizer) {
-        let haptic = UIImpactFeedbackGenerator(style: .light)
-        haptic.prepare()
-        
-        switch gesture.direction {
-        case .left:
-            currentDate = currentDate.nextDay()
+    // Returns the calendar to the current day and shows its tasks.
+    @objc private func returnToToday() {
+        currentDate = Date()
+        let todayMonth = Calendar.current.startOfMonth(for: currentDate)
+        print("Setting todayMonth to: \(todayMonth.toString(format: "yyyy-MM-dd"))")
+        if !isCalendarDayView {
+            calendar.setCurrentPage(todayMonth, animated: true)
             calendar.select(currentDate)
-            tableView.reloadData()
-            haptic.impactOccurred()
-            print("Swiped to next day: \(currentDate.toString(format: "yyyy-MM-dd"))")
-        case .right:
-            currentDate = currentDate.previousDay()
-            calendar.select(currentDate)
-            tableView.reloadData()
-            haptic.impactOccurred()
-            print("Swiped to previous day: \(currentDate.toString(format: "yyyy-MM-dd"))")
-        case .up:
-            let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: currentDate)!
-            calendar.setCurrentPage(nextMonth, animated: true)
-            currentDate = nextMonth
-            tableView.reloadData()
-            haptic.impactOccurred()
-            print("Swiped to next month: \(nextMonth.toString(format: "yyyy-MM-dd"))")
-        case .down:
-            let prevMonth = Calendar.current.date(byAdding: .month, value: -1, to: currentDate)!
-            calendar.setCurrentPage(prevMonth, animated: true)
-            currentDate = prevMonth
-            tableView.reloadData()
-            haptic.impactOccurred()
-            print("Swiped to previous month: \(prevMonth.toString(format: "yyyy-MM-dd"))")
-        default:
-            break
         }
+        tableView.reloadData()
+        updateDateLabel()
+        let haptic = UIImpactFeedbackGenerator(style: .light)
+        haptic.impactOccurred()
+        print("Returned to today: \(currentDate.toString(format: "yyyy-MM-dd"))")
+    }
+    
+    // Navigates to the previous day.
+    @objc private func goToPreviousDay() {
+        if let previousDate = Calendar.current.date(byAdding: .day, value: -1, to: currentDate) {
+            currentDate = previousDate
+            let currentMonth = Calendar.current.startOfMonth(for: currentDate)
+            print("Navigating to previous day: \(currentDate.toString(format: "yyyy-MM-dd")), month: \(currentMonth.toString(format: "yyyy-MM-dd"))")
+            if !isCalendarDayView {
+                calendar.setCurrentPage(currentMonth, animated: true)
+                calendar.select(currentDate)
+            }
+            tableView.reloadData()
+            updateDateLabel()
+            let haptic = UIImpactFeedbackGenerator(style: .light)
+            haptic.impactOccurred()
+        }
+    }
+    
+    // Navigates to the next day.
+    @objc private func goToNextDay() {
+        if let nextDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate) {
+            currentDate = nextDate
+            let currentMonth = Calendar.current.startOfMonth(for: currentDate)
+            print("Navigating to next day: \(currentDate.toString(format: "yyyy-MM-dd")), month: \(currentMonth.toString(format: "yyyy-MM-dd"))")
+            if !isCalendarDayView {
+                calendar.setCurrentPage(currentMonth, animated: true)
+                calendar.select(currentDate)
+            }
+            tableView.reloadData()
+            updateDateLabel()
+            let haptic = UIImpactFeedbackGenerator(style: .light)
+            haptic.impactOccurred()
+        }
+    }
+    
+    // Toggles the calendar visibility between Month and Day views.
+    @objc private func toggleCalendarVisibility() {
+        isCalendarDayView.toggle()
+        calendar.isHidden = isCalendarDayView
+        if !isCalendarDayView {
+            calendar.reloadData() // Refresh for Month view
+            calendar.select(currentDate)
+            let currentMonth = Calendar.current.startOfMonth(for: currentDate)
+            calendar.setCurrentPage(currentMonth, animated: false)
+        }
+        view.setNeedsLayout()
+        let haptic = UIImpactFeedbackGenerator(style: .light)
+        haptic.impactOccurred()
+        print("Calendar set to \(isCalendarDayView ? "day" : "month") view")
+    }
+    
+    // Updates the date button with the current date.
+    private func updateDateLabel() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "E, d MMM yyyy"
+        dateButton.setTitle(formatter.string(from: currentDate), for: .normal)
+        dateButton.sizeToFit()
+        print("Updated date button to: \(dateButton.title(for: .normal) ?? "nil")")
     }
     
     // MARK: Task Management
@@ -152,13 +220,25 @@ extension ViewController: FSCalendarDelegate {
     func calendar(_ calendar: FSCalendar, didSelect date: Date, at monthPosition: FSCalendarMonthPosition) {
         currentDate = date
         tableView.reloadData()
-        print("Selected date: \(date.toString(format: "yyyy-MM-dd"))")
+        updateDateLabel()
+        print("Selected date: \(currentDate.toString(format: "yyyy-MM-dd"))")
     }
     
     func calendarCurrentPageDidChange(_ calendar: FSCalendar) {
-        currentDate = calendar.currentPage
-        tableView.reloadData()
-        print("Page changed to: \(currentDate.toString(format: "yyyy-MM-dd"))")
+        if calendar.selectedDate == nil {
+            currentDate = calendar.currentPage
+            tableView.reloadData()
+            updateDateLabel()
+            print("Page changed to: \(currentDate.toString(format: "yyyy-MM-dd"))")
+        }
+    }
+    
+    func calendar(_ calendar: FSCalendar, shouldSelect date: Date, at monthPosition: FSCalendarMonthPosition) -> Bool {
+        if isCalendarDayView {
+            // In Day view, disable selection since calendar is hidden
+            return false
+        }
+        return true
     }
 }
 
@@ -167,5 +247,15 @@ extension ViewController: FSCalendarDataSource {
     func calendar(_ calendar: FSCalendar, numberOfEventsFor date: Date) -> Int {
         let dateKey = date.toString(format: "yyyy-MM-dd")
         return dataManager.todos[dateKey]?.isEmpty == false ? 1 : 0
+    }
+}
+
+// MARK: - Calendar Extension
+extension Calendar {
+    func startOfMonth(for date: Date) -> Date {
+        var calendar = self
+        calendar.timeZone = TimeZone(identifier: "Australia/Sydney") ?? .current
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: components)!
     }
 }

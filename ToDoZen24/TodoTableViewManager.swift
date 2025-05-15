@@ -1,11 +1,13 @@
+// TodoTableViewManager.swift
+// Manages the UITableView’s data source, delegate, and drag interactions for the to-do list.
+
+// MARK: - Imports
 import UIKit
 
-// MARK: - TodoTableViewManager Class
-// Manages the UITableView’s data source, delegate, and drag interactions for the to-do list, handling task display, editing, copying, and reordering.
+// MARK: - TodoTableViewManager
+// Handles table view data source, delegate, drag-and-drop, and task operations.
 class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate, UITableViewDragDelegate {
-    
-    // MARK: - Properties
-    // References to the table view, data manager, and delegate, plus state for editing and copy tracking.
+    // MARK: Properties
     private weak var tableView: UITableView?
     private let dataManager: TodoDataManager
     private weak var delegate: ViewController?
@@ -13,8 +15,7 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     private var editingIndexPath: IndexPath?
     private var copiedTasks: [String: Set<Int>] = [:] // dateKey: Set<rowIndex>
     
-    // MARK: - Initialization
-    // Sets up the manager with references and enables drag interactions.
+    // MARK: Initialization
     init(tableView: UITableView, dataManager: TodoDataManager, delegate: ViewController) {
         self.tableView = tableView
         self.dataManager = dataManager
@@ -27,7 +28,6 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     }
     
     // MARK: - UITableViewDataSource
-    // Provides data for the table view (number of rows and cells).
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         guard let delegate = delegate else { return 0 }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
@@ -57,7 +57,6 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     }
     
     // MARK: - UITableViewDelegate
-    // Handles user interactions (selection, row height, swipe actions).
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
@@ -103,18 +102,17 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
             let boundingBox = text.boundingRect(
                 with: constraintRect,
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
-                attributes: [.font: font],
-                context: nil
+                attributes: [NSAttributedString.Key.font: font],
+                context: nil as NSStringDrawingContext?
             )
             let textHeight = ceil(boundingBox.height)
             let totalHeight = textHeight + 2 * padding
             return max(44, totalHeight)
         }
-        return 44 // Default for text field row
+        return 44
     }
     
     // MARK: - UITableViewDragDelegate
-    // Supports drag-and-drop reordering of tasks.
     func tableView(_ tableView: UITableView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
         guard let delegate = delegate else { return [] }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
@@ -133,15 +131,7 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     func tableView(_ tableView: UITableView, moveRowAt sourceIndexPath: IndexPath, to destinationIndexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
-        guard var todos = dataManager.todos[dateKey],
-              sourceIndexPath.row < todos.count,
-              destinationIndexPath.row < todos.count else { return }
-        
-        let movedItem = todos.remove(at: sourceIndexPath.row)
-        todos.insert(movedItem, at: destinationIndexPath.row)
-        dataManager.todos[dateKey] = todos
-        dataManager.saveTodos()
-        // Update copiedTasks
+        dataManager.moveTodo(from: sourceIndexPath.row, to: destinationIndexPath.row, for: dateKey)
         if var copiedSet = copiedTasks[dateKey] {
             copiedSet.remove(sourceIndexPath.row)
             if copiedSet.contains(destinationIndexPath.row) {
@@ -154,7 +144,6 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     }
     
     // MARK: - Swipe Actions
-    // Enables swipe-to-delete for tasks.
     func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
         guard let delegate = delegate else { return false }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
@@ -172,13 +161,11 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
         print("Swipe action requested at \(indexPath)")
         if indexPath.row < taskCount {
             let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] (_, _, completion) in
-                guard self != nil else { return }
-                self?.dataManager.todos[dateKey]?.remove(at: indexPath.row)
-                self?.dataManager.saveTodos()
-                // Remove from copiedTasks
-                if var copiedSet = self?.copiedTasks[dateKey] {
+                guard let self = self else { return }
+                self.dataManager.deleteTodo(at: indexPath.row, for: dateKey)
+                if var copiedSet = self.copiedTasks[dateKey] {
                     copiedSet.remove(indexPath.row)
-                    self?.copiedTasks[dateKey] = copiedSet
+                    self.copiedTasks[dateKey] = copiedSet
                 }
                 tableView.deleteRows(at: [indexPath], with: .automatic)
                 delegate.didAddOrEditTask()
@@ -191,13 +178,10 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     }
     
     // MARK: - Task Management
-    // Handles adding, editing, copying, and completing tasks.
     func didAddTask(_ text: String) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
-        if dataManager.todos[dateKey] == nil { dataManager.todos[dateKey] = [] }
-        dataManager.todos[dateKey]?.append(TodoItem(description: text))
-        dataManager.saveTodos()
+        dataManager.addTodo(text, for: dateKey)
         isAddingNewTask = false
         tableView?.reloadData()
         delegate.didAddOrEditTask()
@@ -207,21 +191,15 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     func didEditTask(_ text: String, at indexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
-        if let items = dataManager.todos[dateKey], indexPath.row < items.count {
-            dataManager.todos[dateKey]?[indexPath.row].description = text
-            dataManager.saveTodos()
-            // Clear copied status
-            if var copiedSet = copiedTasks[dateKey] {
-                copiedSet.remove(indexPath.row)
-                copiedTasks[dateKey] = copiedSet
-            }
-            editingIndexPath = nil
-            tableView?.reloadRows(at: [indexPath], with: .automatic)
-            delegate.didAddOrEditTask()
-            print("Edited task at \(indexPath) to: \(text)")
-        } else {
-            print("Failed to edit task at \(indexPath) - index out of bounds or no items")
+        dataManager.editTodo(text, at: indexPath.row, for: dateKey)
+        if var copiedSet = copiedTasks[dateKey] {
+            copiedSet.remove(indexPath.row)
+            copiedTasks[dateKey] = copiedSet
         }
+        editingIndexPath = nil
+        tableView?.reloadRows(at: [indexPath], with: .automatic)
+        delegate.didAddOrEditTask()
+        print("Edited task at \(indexPath) to: \(text)")
     }
     
     func textFieldDidChange(_ text: String?) {
@@ -240,43 +218,24 @@ class TodoTableViewManager: NSObject, UITableViewDataSource, UITableViewDelegate
     func toggleCompletion(at indexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
-        if var items = dataManager.todos[dateKey], indexPath.row < items.count {
-            let oldState = items[indexPath.row].completed
-            items[indexPath.row].completed.toggle()
-            dataManager.todos[dateKey] = items
-            dataManager.saveTodos()
-            tableView?.reloadRows(at: [indexPath], with: .automatic)
-            delegate.didAddOrEditTask()
-            print("Toggled completion at \(indexPath) from \(oldState) to \(items[indexPath.row].completed)")
-        } else {
-            print("Failed to toggle completion at \(indexPath) - index out of bounds or no items")
-        }
+        dataManager.toggleTodoCompletion(at: indexPath.row, for: dateKey)
+        tableView?.reloadRows(at: [indexPath], with: .automatic)
+        delegate.didAddOrEditTask()
+        print("Toggled completion at \(indexPath)")
     }
     
     func copyTaskToNextDay(at indexPath: IndexPath) {
         guard let delegate = delegate else { return }
         let dateKey = delegate.currentDate.toString(format: "yyyy-MM-dd")
         let nextDateKey = delegate.currentDate.nextDay().toString(format: "yyyy-MM-dd")
-        
-        if let items = dataManager.todos[dateKey], indexPath.row < items.count {
-            let originalTask = items[indexPath.row]
-            let copiedTask = TodoItem(description: originalTask.description, completed: false)
-            if dataManager.todos[nextDateKey] == nil { dataManager.todos[nextDateKey] = [] }
-            dataManager.todos[nextDateKey]?.append(copiedTask)
-            dataManager.saveTodos()
-            // Mark as copied
-            if copiedTasks[dateKey] == nil { copiedTasks[dateKey] = [] }
-            copiedTasks[dateKey]?.insert(indexPath.row)
-            tableView?.reloadRows(at: [indexPath], with: .automatic)
-            delegate.didAddOrEditTask()
-            print("Copied task '\(copiedTask.description)' to \(nextDateKey), completed: \(copiedTask.completed)")
-        } else {
-            print("Failed to copy task at \(indexPath) - index out of bounds or no items")
-        }
+        dataManager.copyTodo(at: indexPath.row, from: dateKey, to: nextDateKey)
+        if copiedTasks[dateKey] == nil { copiedTasks[dateKey] = [] }
+        copiedTasks[dateKey]?.insert(indexPath.row)
+        tableView?.reloadRows(at: [indexPath], with: .automatic)
+        delegate.didAddOrEditTask()
+        print("Copied task at \(indexPath) to \(nextDateKey)")
     }
     
-    // MARK: - Persistence
-    // Saves any pending task input when the app resigns active.
     func savePendingTask(currentDate: Date) {
         guard delegate != nil else { return }
         let dateKey = currentDate.toString(format: "yyyy-MM-dd")

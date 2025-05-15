@@ -1,19 +1,38 @@
+// TodoCell.swift
+// Custom table view cell for displaying a to-do item with a title, radio button, and copy button.
+
+// MARK: - Imports
 import UIKit
 
-// MARK: - TodoCell Class
-// Defines a custom UITableViewCell for displaying to-do items, including a radio button for completion, a label for task display, a text field for editing, and a copy button to move the task to the next day.
+// MARK: - TodoCell
+// A table view cell that displays a to-do item’s title, a toggleable radio button, and a copy button.
 class TodoCell: UITableViewCell {
-    
-    // MARK: - Properties
-    // UI components and delegate for interaction with the ViewController.
+    // MARK: Properties
     let radioButton = UIButton(type: .custom)
-    let label = UILabel()
-    let textField = UITextField()
-    let copyButton = UIButton(type: .system)
+    let label: UILabel = {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        return label
+    }()
+    
+    let textField: UITextField = {
+        let textField = UITextField()
+        textField.isHidden = true
+        textField.isUserInteractionEnabled = false
+        return textField
+    }()
+    
+    let copyButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "arrow.right"), for: .normal)
+        button.tintColor = .systemBlue
+        return button
+    }()
+    
     weak var delegate: ViewController?
     
-    // MARK: - Initialization
-    // Sets up the cell with a reuse identifier and initializes the UI.
+    // MARK: Initialization
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
@@ -23,8 +42,8 @@ class TodoCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
-    // MARK: - UI Setup
-    // Configures the appearance and layout of UI components (radio button, label, text field, copy button).
+    // MARK: Setup UI
+    // Configures the appearance and layout of UI components.
     private func setupUI() {
         // Radio button for marking tasks complete
         radioButton.layer.cornerRadius = 8
@@ -34,25 +53,19 @@ class TodoCell: UITableViewCell {
         contentView.addSubview(radioButton)
         
         // Copy button with right arrow icon
-        copyButton.setImage(UIImage(systemName: "arrow.right"), for: .normal)
-        copyButton.tintColor = .systemBlue
         copyButton.addTarget(self, action: #selector(copyButtonTapped), for: .touchUpInside)
         contentView.addSubview(copyButton)
         
         // Label for displaying task description
-        label.numberOfLines = 0 // Allow multiple lines for wrapping
-        label.lineBreakMode = .byWordWrapping
         contentView.addSubview(label)
         
         // Text field for editing task description
         textField.delegate = self
-        textField.isHidden = true
-        textField.isUserInteractionEnabled = false
         contentView.addSubview(textField)
     }
     
-    // MARK: - Layout
-    // Adjusts the frames of UI components based on the cell’s size, ensuring text wraps and fits.
+    // MARK: Layout
+    // Adjusts the frames of UI components based on the cell’s size.
     override func layoutSubviews() {
         super.layoutSubviews()
         let padding: CGFloat = 10
@@ -89,12 +102,12 @@ class TodoCell: UITableViewCell {
         )
     }
     
-    // MARK: - Configuration
+    // MARK: Configuration
     // Updates the cell’s UI based on the to-do item’s data, editing state, and copy status.
     func configure(with item: TodoItem, isEditing: Bool, indexPath: IndexPath, delegate: ViewController, isCopied: Bool) {
         self.delegate = delegate
         
-        // Configure radio button (completion dot)
+        // Configure radio button
         radioButton.subviews.forEach { if $0.tag == 999 { $0.removeFromSuperview() } }
         if item.completed {
             let dot = UIView(frame: CGRect(x: 4, y: 4, width: 8, height: 8))
@@ -102,11 +115,13 @@ class TodoCell: UITableViewCell {
             dot.layer.cornerRadius = 4
             dot.tag = 999
             radioButton.addSubview(dot)
+            radioButton.accessibilityLabel = "Completed"
         } else {
             radioButton.backgroundColor = .clear
+            radioButton.accessibilityLabel = "Not completed"
         }
         
-        // Set copy button color (grey if copied, blue if not)
+        // Set copy button color
         copyButton.tintColor = isCopied ? .systemGray : .systemBlue
         
         // Configure label or text field
@@ -130,15 +145,15 @@ class TodoCell: UITableViewCell {
         }
     }
     
-    // MARK: - Actions
-    // Handles user interactions with the radio button and copy button.
+    // MARK: Actions
+    // Handles radio button and copy button taps.
     @objc private func radioButtonTapped() {
         guard let tableView = superview as? UITableView,
               let indexPath = tableView.indexPath(for: self) else {
             print("Failed to get current indexPath for cell")
             return
         }
-        print("Radio button tapped at \(indexPath), target still set: \(radioButton.allTargets.count > 0)")
+        print("Radio button tapped at \(indexPath)")
         delegate?.toggleCompletion(at: indexPath)
     }
     
@@ -154,7 +169,6 @@ class TodoCell: UITableViewCell {
 }
 
 // MARK: - UITextFieldDelegate
-// Manages text field behavior for editing tasks.
 extension TodoCell: UITextFieldDelegate {
     func textFieldDidEndEditing(_ textField: UITextField) {
         guard let text = textField.text, !text.isEmpty, let delegate = delegate,
